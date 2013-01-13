@@ -1,6 +1,6 @@
 source :rubygems
 
 gem 'thor'
-gem 'whenever'
+gem 'activesupport'
 gem 'feedzirra'
 gem 'twitter'

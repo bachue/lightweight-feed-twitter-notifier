@@ -2,6 +2,7 @@ require 'thor'
 require 'feedzirra'
 require 'twitter'
 require 'logger'
+require 'active_support/all'
 
 TWEET_MAX_LENGTH = 140
 SHORT_URL_LENGTH = 23
@@ -9,23 +10,35 @@ SHORT_URL_LENGTH = 23
 class Sync < Thor
   desc 'all', 'Sync all new feeds from Ruby China to Twitter'
   def all
-    feed.entries.reverse.each do |entry|
-      next if has_sent_before?(entry)
-      t = tweet(entry) 
-      retry_count = 0
-      begin
-        retry_count += 1
-        twitter.update t
-        touch_timestamp(entry)
-        logger.info t
-      rescue
-        retry if retry_count < 3
-        log_lost t
-      end
+    feed.entries.reverse.each { |entry| twitter(entry) }
+  end
+
+  desc 'continuously', 'Sync all new feeds from Ruby China to Twitter Continuously'
+  def continuously
+    invoke :all
+    loop do
+      sleep 1.minute
+      feed = update_feed
+      feed.new_entries.reverse.each { |entry| twitter(entry) } if feed.updated?
     end
   end
 
   private
+    def twitter(entry)
+      return if has_sent_before?(entry)
+      tweet = tweet(entry) 
+      retry_count = 0
+      begin
+        retry_count += 1
+        client.update tweet
+        touch_timestamp(entry)
+        logger.info tweet
+      rescue
+        retry if retry_count < 3
+        log_lost tweet
+      end
+    end
+
     def feed
       @@feed ||= Feedzirra::Feed.fetch_and_parse 'http://ruby-china.org/topics/feed',
                     on_success: ->(url, feed){
@@ -37,8 +50,12 @@ class Sync < Thor
                     }
     end
 
-    def twitter
-      @@twitter ||= Twitter::Client.new(client_info)
+    def update_feed
+      Feedzirra::Feed.update(feed)
+    end
+
+    def client
+      @@twitter_client ||= Twitter::Client.new(client_info)
     end
 
     def client_info
@@ -60,10 +77,10 @@ class Sync < Thor
       File.write last_timestamp_path, entry.published.to_i
     end
 
-    def log_lost(t)
+    def log_lost(tweet)
       lost_file = lost_file_path
-      logger.error "Failed to tweet '#{t}', reason: #{$!}, have log it into #{lost_file}"
-      File.write lost_file, t
+      logger.error "Failed to tweet '#{tweet}', reason: #{$!}, have log it into #{lost_file}"
+      File.write lost_file, tweet
     end
 
     def has_sent_before?(entry)
