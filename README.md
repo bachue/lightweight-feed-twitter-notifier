@@ -6,7 +6,8 @@ This is a Project which can fetch, parse all feed from [ruby-china.org]("http://
 
 * [feedzirra](https://github.com/pauldix/feedzirra), to fetch and parse feed from url
 * [twitter](https://github.com/sferik/twitter), to tweet
-* [thor](https://github.com/wycats/thor), to manager tasks
+* [thor](https://github.com/wycats/thor), to manage tasks
+* [god](https://github.com/mojombo/god), to manage daemons
 
 ###Notice###
 This project is quite new, if you find any problems of tweets from [@RubyChinaTopics](https://twitter.com/RubyChinaTopics), please notice me as soon as possible. 
