@@ -17,7 +17,7 @@ class Sync < Thor
   def continuously
     invoke :all
     loop do
-      sleep 2.minutes
+      sleep 3.minutes
       feed = update_feed
       feed.new_entries.reverse.each { |entry| twitter(entry) } if feed.updated?
     end
