@@ -1,6 +1,7 @@
 var/last
 log/*.log
 config/*.yml
+config/*test*
 lost/*.tweet
 Gemfile.lock
 *~

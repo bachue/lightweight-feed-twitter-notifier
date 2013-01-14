@@ -40,7 +40,7 @@ class Sync < Thor
     end
 
     def feed
-      @@feed ||= Feedzirra::Feed.fetch_and_parse 'http://ruby-china.org/topics/feed',
+      @feed ||= Feedzirra::Feed.fetch_and_parse feed_source,
                     on_success: ->(url, feed){
                       logger.info "Fetch & Parse #{url} ..."
                     },
@@ -55,15 +55,15 @@ class Sync < Thor
     end
 
     def client
-      @@twitter_client ||= Twitter::Client.new(client_info)
+      @twitter_client ||= Twitter::Client.new(client_info)
     end
 
     def client_info
-      @@client_info ||= YAML.load_file(config_file('key.yml')).symbolize_keys
+      @client_info ||= YAML.load_file(config_file('key.yml')).symbolize_keys
     end
 
     def logger
-      @@logger ||= Logger.new(log_file('ruby-china-twitter-notifier.log'))
+      @logger ||= Logger.new(log_file('ruby-china-twitter-notifier.log'))
     end
 
     def tweet(entry)
@@ -74,6 +74,7 @@ class Sync < Thor
     end
 
     def touch_timestamp(entry)
+      @last_timestamp = entry.published.to_i
       File.write last_timestamp_path, entry.published.to_i
     end
 
@@ -84,14 +85,14 @@ class Sync < Thor
     end
 
     def has_sent_before?(entry)
-      return false unless File.exists?(last_timestamp_path)
+      return false unless @last_timestamp || File.exists?(last_timestamp_path)
       entry_published_time = entry.published.to_i
-      last_entry_time = File.read(last_timestamp_path).to_i
+      last_entry_time = @last_timestamp || File.read(last_timestamp_path).to_i
       entry_published_time <= last_entry_time
     end
 
     def root_dir
-      @@root_dir ||= File.expand_path(File.dirname(__FILE__))
+      @root_dir ||= File.expand_path(File.dirname(__FILE__))
     end
 
     def log_file(filename)
@@ -110,12 +111,20 @@ class Sync < Thor
       File.join(root_dir, 'lost', filename)
     end
 
+    def feed_source
+      if File.exists? config_file('test_feed')
+        File.read config_file('test_feed')
+      else
+        'http://ruby-china.org/topics/feed'
+      end
+    end
+
     def lost_file_path
       name = Time.now.to_f.to_s.sub('.', '') + '.tweet'
       lost_file(name)
     end
 
     def last_timestamp_path
-      @@last_timestamp_path ||= var_file('last')
+      @last_timestamp_path ||= var_file('last')
     end
 end
