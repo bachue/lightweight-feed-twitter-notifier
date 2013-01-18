@@ -10,7 +10,7 @@ SHORT_URL_LENGTH = 23
 class Sync < Thor
   desc 'all', 'Sync all new feeds from Ruby China to Twitter'
   def all
-    feed.entries.reverse.each { |entry| twitter(entry) }
+    feed.entries.reverse.each { |entry| twitter(entry) } rescue logger.error "#{$!}\n#{$@.join("\n")}"
   end
 
   desc 'continuously', 'Sync all new feeds from Ruby China to Twitter Continuously'
@@ -18,8 +18,12 @@ class Sync < Thor
     invoke :all
     loop do
       sleep 3.minutes
-      feed = update_feed
-      feed.new_entries.reverse.each { |entry| twitter(entry) } if feed.updated?
+      begin
+        feed = update_feed
+        feed.new_entries.reverse.each { |entry| twitter(entry) } if feed.updated?
+      rescue
+        logger.error "#{$!}\n#{$@.join("\n")}"
+      end
     end
   end
 

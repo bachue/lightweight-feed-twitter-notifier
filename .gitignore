@@ -6,3 +6,4 @@ lost/*.tweet
 Gemfile.lock
 *~
 *.swp
+.rvmrc

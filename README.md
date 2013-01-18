@@ -9,6 +9,9 @@ This is a Project which can fetch, parse all feed from [ruby-china.org]("http://
 * [thor](https://github.com/wycats/thor), to manage tasks
 * [god](https://github.com/mojombo/god), to manage daemons
 
+###Ruby Version###
+1.9.3
+
 ###Notice###
 This project is quite new, if you find any problems of tweets from [@RubyChinaTopics](https://twitter.com/RubyChinaTopics), please notice me as soon as possible. 
 
