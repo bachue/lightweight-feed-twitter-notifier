@@ -20,7 +20,7 @@ class Sync < Thor
       sleep 3.minutes
       begin
         feed = update_feed
-        feed.new_entries.reverse.each { |entry| twitter(entry) } if feed.respond_to? :updated? && feed.updated?
+        feed.new_entries.reverse.each { |entry| twitter(entry) } if feed.respond_to?(:updated?) && feed.updated?
       rescue
         logger.error "#{$!}\n#{$@.join("\n")}"
       end
