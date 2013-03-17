@@ -19,6 +19,7 @@ class Sync < Thor
     loop do
       sleep 3.minutes
       begin
+        log_time
         feed = update_feed
         feed.new_entries.reverse.each { |entry| twitter(entry) } if feed.respond_to?(:updated?) && feed.updated?
       rescue
@@ -30,7 +31,7 @@ class Sync < Thor
   private
     def twitter(entry)
       return if has_sent_before?(entry)
-      tweet = tweet(entry) 
+      tweet = tweet(entry)
       retry_count = 0
       begin
         retry_count += 1
@@ -75,6 +76,14 @@ class Sync < Thor
         entry.title[(TWEET_MAX_LENGTH - SHORT_URL_LENGTH - 1 - 3)..-1] = '...'
       end
       "#{entry.title} #{entry.url}"
+    end
+
+    def log_time
+      time_logger.info Time.now
+    end
+
+    def time_logger
+      @time_logger ||= Logger.new(log_file('time.log'))
     end
 
     def touch_timestamp(entry)
