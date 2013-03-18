@@ -19,7 +19,7 @@ class Sync < Thor
     loop do
       sleep 3.minutes
       begin
-        log_time
+        log_timestamp
         feed = update_feed
         feed.new_entries.reverse.each { |entry| twitter(entry) } if feed.respond_to?(:updated?) && feed.updated?
       rescue
@@ -78,12 +78,12 @@ class Sync < Thor
       "#{entry.title} #{entry.url}"
     end
 
-    def log_time
-      time_logger.info Time.now
+    def log_timestamp
+      File.write log_timestamp_path, Time.now
     end
 
-    def time_logger
-      @time_logger ||= Logger.new(log_file('time.log'))
+    def log_timestamp_path
+      var_file('time')
     end
 
     def touch_timestamp(entry)
