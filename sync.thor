@@ -21,7 +21,7 @@ class Sync < Thor
       sleep 3.minutes
       begin
         log_timestamp
-        Timeout::timeout(5) do
+        Timeout::timeout(2.minutes) do
           feed = update_feed
           feed.new_entries.reverse.each { |entry| twitter(entry) } if feed.respond_to?(:updated?) && feed.updated?
         end
