@@ -2,6 +2,7 @@ require 'thor'
 require 'feedzirra'
 require 'twitter'
 require 'logger'
+require 'timeout'
 require 'active_support/all'
 
 TWEET_MAX_LENGTH = 140
@@ -20,8 +21,10 @@ class Sync < Thor
       sleep 3.minutes
       begin
         log_timestamp
-        feed = update_feed
-        feed.new_entries.reverse.each { |entry| twitter(entry) } if feed.respond_to?(:updated?) && feed.updated?
+        Timeout::timeout(5) do
+          feed = update_feed
+          feed.new_entries.reverse.each { |entry| twitter(entry) } if feed.respond_to?(:updated?) && feed.updated?
+        end
       rescue
         logger.error "#{$!}\n#{$@.join("\n")}"
       end
