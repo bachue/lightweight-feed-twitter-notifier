@@ -1,4 +1,4 @@
-var/last
+var/*
 log/*.log
 config/*.yml
 config/*test*
