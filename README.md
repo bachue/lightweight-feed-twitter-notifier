@@ -12,7 +12,7 @@ Welcome to deploy it on your personal server!
 * [god](https://github.com/mojombo/god), to manage daemons
 
 ###Required Ruby Version
->= 1.9.3
+\>= 1.9.3
 
 ###Notice
 This project is quite new, if you find any problems, please notice me as soon as possible.
