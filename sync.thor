@@ -11,7 +11,11 @@ SHORT_URL_LENGTH = 23
 class Sync < Thor
   desc 'all', 'Sync all new feeds from Ruby China to Twitter'
   def all
-    feed.entries.reverse.each { |entry| twitter(entry) } rescue logger.error "#{$!}\n#{$@.join("\n")}"
+    feeds_clients.each do |name, feed_client|
+      feed = feed_client[:feed]
+      client = feed_client[:client]
+      feed.entries.reverse.each { |entry| tweet entry, name, client } rescue logger.error "#{$!}\n#{$@.join("\n")}"
+    end
   end
 
   desc 'continuously', 'Sync all new feeds from Ruby China to Twitter Continuously'
@@ -19,62 +23,54 @@ class Sync < Thor
     invoke :all
     loop do
       sleep 3.minutes
-      begin
-        log_timestamp
-        Timeout::timeout(2.minutes) do
-          feed = update_feed
-          feed.new_entries.reverse.each { |entry| twitter(entry) } if feed.respond_to?(:updated?) && feed.updated?
+      feeds_clients.each do |name, feed_client|
+        feed = feed_client[:feed]
+        client = feed_client[:client]
+        begin
+          log_timestamp
+          Timeout::timeout(2.minutes) do
+            feed = update_feed(feed)
+            feed.new_entries.reverse.each { |entry| tweet(entry, name, client) } if feed.respond_to?(:updated?) && feed.updated?
+          end
+        rescue
+          logger.error "#{$!}\n#{$@.join("\n")}"
         end
-      rescue
-        logger.error "#{$!}\n#{$@.join("\n")}"
       end
     end
   end
 
   private
-    def twitter(entry)
-      return if has_sent_before?(entry)
-      tweet = tweet(entry)
+    def tweet entry, name, client
+      return if has_sent_before?(name, entry)
+      tweet = build_tweet(entry)
       retry_count = 0
       begin
         retry_count += 1
         client.update tweet
-        touch_timestamp(entry)
-        logger.info tweet
+        touch_timestamp name, entry
+        log_tweet name, tweet
       rescue
         retry if retry_count < 3
-        log_lost tweet
+        log_lost name, tweet
       end
     end
 
-    def feed
-      @feed ||= Feedzirra::Feed.fetch_and_parse feed_source,
-                    on_success: ->(url, feed){
-                      logger.info "Fetch & Parse #{url} ..."
-                    },
-                    on_failure: ->(url, code, header, body){
-                      logger.error "Failed to Fetch & Parse #{url}\nError code: #{code}\nError header: #{header}\nError body: #{body}"
-                      exit 1
-                    }
-    end
-
-    def update_feed
-      Feedzirra::Feed.update(feed)
-    end
-
-    def client
-      @twitter_client ||= Twitter::Client.new(client_info)
-    end
-
-    def client_info
-      @client_info ||= YAML.load_file(config_file('key.yml')).symbolize_keys
+    def update_feed feed
+      Feedzirra::Feed.update feed
     end
 
     def logger
-      @logger ||= Logger.new(log_file('ruby-china-twitter-notifier.log'))
+      @logger ||= Logger.new log_file('status.log')
     end
 
-    def tweet(entry)
+    def log_tweet(name, tweet)
+      logger.info "Feed: #{name}"
+      logger.info "Time: #{Time.now}"
+      logger.info "Tweet: #{tweet}"
+      logger.info ''
+    end
+
+    def build_tweet(entry)
       if entry.title.size > TWEET_MAX_LENGTH - SHORT_URL_LENGTH - 1
         entry.title[(TWEET_MAX_LENGTH - SHORT_URL_LENGTH - 1 - 3)..-1] = '...'
       end
@@ -82,33 +78,36 @@ class Sync < Thor
     end
 
     def log_timestamp
-      File.write log_timestamp_path, Time.now
+      File.write log_timestamp_path, Time.now.to_s
     end
 
     def log_timestamp_path
       var_file('time')
     end
 
-    def touch_timestamp(entry)
-      @last_timestamp = entry.published.to_i
-      File.write last_timestamp_path, entry.published.to_i
+    def touch_timestamp name, entry
+      @last_timestamp ||= {}
+      @last_timestamp[name] = entry.published.to_i
+      File.write last_timestamp_path(name), entry.published.to_i
     end
 
-    def log_lost(tweet)
-      lost_file = lost_file_path
-      logger.error "Failed to tweet '#{tweet}', reason: #{$!}, have log it into #{lost_file}"
+    def log_lost name, tweet
+      lost_file = lost_file_path name
+      logger.error "Failed to tweet '#{tweet}' for #{name}, reason: #{$!}, have log it into #{lost_file}"
       File.write lost_file, tweet
     end
 
-    def has_sent_before?(entry)
-      return false unless @last_timestamp || File.exists?(last_timestamp_path)
+    def has_sent_before? name, entry
+      @last_timestamp ||= {}
+      return false unless @last_timestamp[name] || File.exists?(last_timestamp_path(name))
       entry_published_time = entry.published.to_i
-      last_entry_time = @last_timestamp || File.read(last_timestamp_path).to_i
+
+      last_entry_time = @last_timestamp[name] || File.read(last_timestamp_path(name)).to_i
       entry_published_time <= last_entry_time
     end
 
     def root_dir
-      @root_dir ||= File.expand_path(File.dirname(__FILE__))
+      @_root_dir ||= File.expand_path(File.dirname(__FILE__))
     end
 
     def log_file(filename)
@@ -127,20 +126,47 @@ class Sync < Thor
       File.join(root_dir, 'lost', filename)
     end
 
-    def feed_source
-      if File.exists? config_file('test_feed')
-        File.read config_file('test_feed')
-      else
-        'http://ruby-china.org/topics/feed'
+    def feeds_clients
+      @_feeds_clients ||= begin
+        Hash[feeds_info.map {|name, info|
+          feed = build_feed info['feed']
+          client_info = info.select {|k, _|
+            ['consumer_key', 'consumer_secret', 'oauth_token', 'oauth_token_secret'].include?(k)
+          }.symbolize_keys
+          [name, {feed: feed, client: Twitter::Client.new(client_info)}]
+        }]
       end
     end
 
-    def lost_file_path
-      name = Time.now.to_f.to_s.sub('.', '') + '.tweet'
+    def build_feed source
+      Feedzirra::Feed.fetch_and_parse source,
+        on_success: ->(url, feed){
+          logger.info "#{Time.now}: Fetch & Parse #{url} ..."
+        },
+        on_failure: ->(url, code, header, body){
+          logger.error "#{Time.now}: Failed to Fetch & Parse #{url}\nError code: #{code}\nError header: #{header}\nError body: #{body}"
+          exit 1
+        }
+    end
+
+
+    def feeds_info
+      @_feeds_info ||= begin
+        if File.exists? config_file('feeds.yml')
+          YAML.load_file config_file('feeds.yml')
+        else
+          raise LoadError.new '"feeds.yml" not found, please copy feeds.yml.example to feeds.yml and put all your feeds to it!'
+        end
+      end
+    end
+
+    def lost_file_path name
+      name = "#{Time.now.to_f.to_s.sub('.', '')}-#{name}.tweet"
       lost_file(name)
     end
 
-    def last_timestamp_path
-      @last_timestamp_path ||= var_file('last')
+    def last_timestamp_path name
+      @_last_timestamp_paths ||= Hash.new {|h, name| h[name] = var_file("#{name}.last") }
+      @_last_timestamp_paths[name]
     end
 end

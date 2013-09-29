@@ -1,0 +1,6 @@
+example_site:
+    feed: FEED_URL
+    consumer_key: COMSUMER_KEY
+    consumer_secret: CONSUMER_SECRET
+    oauth_token: OAUTH_TOKEN
+    oauth_token_secret: OAUTH_TOKEN_SECRET
