@@ -13,6 +13,7 @@ class Sync < Thor
   def all
     feeds_clients.each do |name, feed_client|
       feed = feed_client[:feed]
+      feed = filter_feed(feed, feed_client[:start_from])
       client = feed_client[:client]
       feed.entries.reverse.each { |entry| tweet entry, name, client } rescue logger.error "#{$!}\n#{$@.join("\n")}"
     end
@@ -129,17 +130,20 @@ class Sync < Thor
     def feeds_clients
       @_feeds_clients ||= begin
         Hash[feeds_info.map {|name, info|
-          feed = build_feed info['feed']
+          start_from = DateTime.parse(info['start_from']).to_time if info['start_from']
+          feed = build_feed info['feed'], start_from
           client_info = info.select {|k, _|
             ['consumer_key', 'consumer_secret', 'oauth_token', 'oauth_token_secret'].include?(k)
           }.symbolize_keys
-          [name, {feed: feed, client: Twitter::Client.new(client_info)}]
+          [name, {feed: feed, client: Twitter::Client.new(client_info), start_from: start_from}]
         }]
       end
     end
 
-    def build_feed source
+    def build_feed source, start_from 
+      start_from ||= Time.now
       Feedzirra::Feed.fetch_and_parse source,
+        if_modified_since: start_from,
         on_success: ->(url, feed){
           logger.info "#{Time.now}: Fetch & Parse #{url} ..."
         },
@@ -149,6 +153,10 @@ class Sync < Thor
         }
     end
 
+    def filter_feed(feed, since)
+      feed.entries = feed.entries.select {|entry| entry.published > since } if since
+      feed
+    end
 
     def feeds_info
       @_feeds_info ||= begin

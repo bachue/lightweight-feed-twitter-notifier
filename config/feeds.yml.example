@@ -4,3 +4,4 @@ example_site:
     consumer_secret: CONSUMER_SECRET
     oauth_token: OAUTH_TOKEN
     oauth_token_secret: OAUTH_TOKEN_SECRET
+    start_from: YYYY-MM-DD
