@@ -131,7 +131,7 @@ class Sync < Thor
       @_feeds_clients ||= begin
         Hash[feeds_info.map {|name, info|
           start_from = DateTime.parse(info['start_from']).to_time if info['start_from']
-          feed = build_feed info['feed'], start_from
+          feed = build_feed info['feed']
           client_info = info.select {|k, _|
             ['consumer_key', 'consumer_secret', 'oauth_token', 'oauth_token_secret'].include?(k)
           }.symbolize_keys
@@ -140,10 +140,8 @@ class Sync < Thor
       end
     end
 
-    def build_feed source, start_from 
-      start_from ||= Time.now
+    def build_feed source
       Feedzirra::Feed.fetch_and_parse source,
-        if_modified_since: start_from,
         on_success: ->(url, feed){
           logger.info "#{Time.now}: Fetch & Parse #{url} ..."
         },
