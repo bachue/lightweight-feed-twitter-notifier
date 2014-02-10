@@ -2,7 +2,6 @@ var/*
 log/*.log
 config/*.yml
 lost/*.tweet
-Gemfile.lock
 *~
 *.swp
 .rvmrc
