@@ -132,9 +132,7 @@ class Sync < Thor
         Hash[feeds_info.map {|name, info|
           start_from = DateTime.parse(info['start_from']).to_time if info['start_from']
           feed = build_feed info['feed']
-          client_info = info.select {|k, _|
-            ['consumer_key', 'consumer_secret', 'oauth_token', 'oauth_token_secret'].include?(k)
-          }.symbolize_keys
+          client_info = info.slice('consumer_key', 'consumer_secret', 'oauth_token', 'oauth_token_secret').symbolize_keys
           [name, {feed: feed, client: Twitter::Client.new(client_info), start_from: start_from}]
         }]
       end
